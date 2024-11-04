@@ -1,0 +1,11 @@
+test*/
+run/
+results*/
+*.tensor
+*.txt
+*.wav
+*.mp3
+*.ckpt
+*.pt
+__pycache__/
+*.pkl
