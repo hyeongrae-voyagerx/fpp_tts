@@ -9,3 +9,6 @@ results*/
 *.pt
 __pycache__/
 *.pkl
+.gradio/
+.gitignore
+test*
