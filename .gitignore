@@ -10,4 +10,4 @@ results*/
 __pycache__/
 *.pkl
 .gradio/
-test*
+test.py
