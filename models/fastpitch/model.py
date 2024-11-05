@@ -103,14 +103,17 @@ class TemporalPredictor(nn.Module):
     """Predicts a single float per each temporal location"""
 
     def __init__(
-        self, input_size, filter_size, kernel_size, dropout, n_layers=2, n_predictions=1, n_vocab=None
+        self, input_size, filter_size, kernel_size, dropout, n_layers=2, n_predictions=1, 
+        forward_pe=False, reverse_pe=False
     ):
         super(TemporalPredictor, self).__init__()
 
         # if n_vocab is not None:
         #     self.emb = nn.Embedding(n_vocab, input_size)
-        self.pe = PositionalEmbedding(input_size)
-
+        if forward_pe or reverse_pe:
+            self.pe = PositionalEmbedding(input_size)
+        if reverse_pe:
+            input_size *=2
         self.layers = nn.Sequential(
             *[
                 ConvReLUNorm(
@@ -124,14 +127,20 @@ class TemporalPredictor(nn.Module):
         )
         self.n_predictions = n_predictions
         self.fc = nn.Linear(filter_size, self.n_predictions, bias=True)
+        self.forward_pe = forward_pe
+        self.reverse_pe = reverse_pe
 
-
-    def forward(self, enc_out, enc_out_mask, pitch=False):
-        # if hasattr(self, "emb"):
-        #     enc_out = self.emb(enc_out)
-        if pitch:
+    def forward(self, enc_out, enc_out_mask):
+        if self.forward_pe:
             pos_seq = torch.arange(enc_out.shape[1], device=enc_out.device, dtype=enc_out.dtype)
             enc_out = enc_out + self.pe(pos_seq) * enc_out_mask
+        if self.reverse_pe:
+            pos_seq = torch.arange(enc_out.shape[1], device=enc_out.device, dtype=enc_out.dtype)
+            pe = self.pe(pos_seq).squeeze()
+            pos_seq = pos_seq * enc_out_mask.squeeze()
+            pos_seq = (pos_seq.amax(1)[:, None] - pos_seq) * enc_out_mask.squeeze()
+            pe = pe[pos_seq.to(torch.long)]
+            enc_out = torch.cat((enc_out, pe), -1)
         out = enc_out * enc_out_mask
         out = self.layers(out.transpose(1, 2)).transpose(1, 2)
         out = self.fc(out) * enc_out_mask
@@ -182,6 +191,8 @@ class FastPitch(nn.Module):
             kernel_size=self.model_cfg.dur_pred_kernel_size,
             dropout=self.model_cfg.dur_pred_dropout,
             n_layers=self.model_cfg.dur_pred_n_layers,
+            forward_pe=False,
+            reverse_pe=False,
         )
 
         self.decoder = FFTransformer(
@@ -206,7 +217,8 @@ class FastPitch(nn.Module):
             dropout=self.model_cfg.pitch_pred_dropout,
             n_layers=self.model_cfg.pitch_pred_n_layers,
             n_predictions=self.model_cfg.pitch_cond_formants,
-            n_vocab=self.model_cfg.n_symbols,
+            forward_pe=True,
+            reverse_pe=True,
         )
 
         self.pitch_emb = nn.Conv1d(
@@ -229,7 +241,8 @@ class FastPitch(nn.Module):
                 dropout=self.model_cfg.energy_pred_dropout,
                 n_layers=self.model_cfg.energy_pred_n_layers,
                 n_predictions=1,
-                n_vocab=self.model_cfg.n_symbols,
+                forward_pe=False,
+                reverse_pe=False
             )
 
             self.energy_emb = nn.Conv1d(
@@ -602,7 +615,7 @@ class FastPitch(nn.Module):
                 dur_pred = self.clamp_punctuation(inputs, dur_pred, min_pause)
 
             # Pitch over chars
-            pitch_pred = self.pitch_predictor(enc_out, enc_mask, pitch=True).permute(0, 2, 1)
+            pitch_pred = self.pitch_predictor(enc_out, enc_mask).permute(0, 2, 1)
             if improve:
                 pitch_pred += pitch_addition
                 old_pitch = pitch_pred.clone().detach()

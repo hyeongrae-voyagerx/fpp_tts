@@ -604,7 +604,7 @@ class FPCFM(nn.Module):
             len_regulated = inputs
             if self.saln:
                 mel_out, _ = self.decoder.sample(
-                    len_regulated, style_vector=enc_style_vector, cfg_strength=0
+                    len_regulated, style_vector=enc_style_vector, cfg_strength=1.
                 )
             else:
                 mel_out, _ = self.decoder(len_regulated, dec_lens)

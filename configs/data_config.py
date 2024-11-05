@@ -87,7 +87,7 @@ class DataConfig:
                 },
                 "dataloader_kwargs": {
                     "batch_size": 32,
-                    "num_workers": 32,
+                    "num_workers": 16,
                     "drop_last": True,
                 }
             },
@@ -97,7 +97,7 @@ class DataConfig:
                 },
                 "dataloader_kwargs": {
                     "batch_size": 32,
-                    "num_workers": 32,
+                    "num_workers": 16,
                     "drop_last": True,
                 }
             }
@@ -140,6 +140,32 @@ class DataConfig:
                 "dataloader_kwargs": {
                     "batch_size": 8,
                     "num_workers": 8,
+                    "drop_last": True,
+                }
+            }
+        )
+
+    @classmethod
+    def matcha_base(cls):
+        return cls(
+            name="korean_va",
+            train_kwargs = {
+                "dataset_kwargs": {
+                    "data_dir": "/data/tts/korean_va/train/"
+                },
+                "dataloader_kwargs": {
+                    "batch_size": 32,
+                    "num_workers": 16,
+                    "drop_last": True,
+                }
+            },
+            valid_kwargs = {
+                "dataset_kwargs": {
+                    "data_dir": "/data/tts/korean_va/val/"
+                },
+                "dataloader_kwargs": {
+                    "batch_size": 32,
+                    "num_workers": 16,
                     "drop_last": True,
                 }
             }

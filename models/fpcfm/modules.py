@@ -87,7 +87,7 @@ class SinusPositionEmbedding(nn.Module):
 # convolutional position embedding
 
 class ConvPositionEmbedding(nn.Module):
-    def __init__(self, dim, kernel_size = 31, groups = 16):
+    def __init__(self, dim, kernel_size = 1, groups = 16):
         super().__init__()
         assert kernel_size % 2 != 0
         self.conv1d = nn.Sequential(

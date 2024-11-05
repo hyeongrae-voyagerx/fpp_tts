@@ -73,3 +73,11 @@ class Config:
             trainer_config=TrainerConfig.fpbigvgan_base(),
             data_config=DataConfig.fpbigvgan_base()
         )
+    
+    @classmethod
+    def matcha_base(cls):
+        return cls(
+            model_name="matcha",
+            trainer_config=TrainerConfig.matcha_base(),
+            data_config=DataConfig.matcha_base()
+        )

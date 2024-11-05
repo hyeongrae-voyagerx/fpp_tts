@@ -14,7 +14,7 @@ class ModelConfig:
     in_fft_layers: int = 6
     in_fft_heads: int = 1
     in_fft_head_dims: int = 64
-    in_fft_kernel_size: int = 3
+    in_fft_kernel_size: int = 1
     in_fft_filter_size: int = 1536
     in_fft_output_size: int = 384
     in_fft_dropout: float = 0.1
@@ -24,20 +24,20 @@ class ModelConfig:
     out_fft_layers: int = 6
     out_fft_heads: int = 1
     out_fft_head_dims: int = 64
-    out_fft_kernel_size: int = 3
+    out_fft_kernel_size: int = 1
     out_fft_filter_size: int = 1536
     out_fft_output_size: int = 384
     out_fft_dropout: float = 0.1
     out_fft_att_dropout: float = 0.1
     out_fft_emb_dropout: float = 0.0
 
-    dur_pred_kernel_size: int = 3
+    dur_pred_kernel_size: int = 1
     dur_pred_filter_size: int = 256
     dur_pred_dropout: float = 0.1
     dur_pred_n_layers: int = 2
     dur_loss_scale: float = 0.1
 
-    pitch_pred_kernel_size: int = 3
+    pitch_pred_kernel_size: int = 1
     pitch_pred_filter_size: int = 256
     pitch_pred_dropout: float = 0.1
     pitch_pred_n_layers: int = 2
@@ -45,7 +45,7 @@ class ModelConfig:
     pitch_loss_scale: float = 0.1
 
     energy_conditioning: bool = True
-    energy_pred_kernel_size: int = 3
+    energy_pred_kernel_size: int = 1
     energy_pred_filter_size: int = 256
     energy_pred_dropout: float = 0.1
     energy_pred_n_layers: int = 2

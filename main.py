@@ -11,7 +11,8 @@ from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-952/last.ckpt"
-_start_weight = "results3/latest_1935p.pt"
+_start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
+# _start_weight = "results3/latest_1935p.pt"
 
 class Trainer:
     def __init__(self, args):
@@ -40,15 +41,15 @@ class Trainer:
             if data[i] is None:
                 continue
             data[i] = data[i].to(device=_device, non_blocking=True)
-        # try:
-        model_out = self.model.training_step(data, step)
-        # except KeyboardInterrupt:
-        #     breakpoint()
-        # except:
-        #     print("piui")
-        #     loss.add(0, "loss")
-        #     return loss
-        # model_out.pop("loss")
+        try:
+            model_out = self.model.training_step(data, step)
+        except KeyboardInterrupt:
+            breakpoint()
+        except:
+            print("piui")
+            loss.add(0, "loss")
+            return loss
+        model_out.pop("loss")
         for item in filter(lambda x: "loss" in x, model_out):
             loss.add(model_out[item], item)
 

@@ -45,3 +45,10 @@ class TrainerConfig:
             num_train_step = 1_000_000,
             best_loss_key = "loss_g_total"
         )
+    
+    @classmethod
+    def matcha_base(cls):
+        return cls(
+            use_ema=False,
+            num_train_step = 1_000_000,
+        )

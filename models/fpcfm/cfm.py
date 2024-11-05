@@ -28,7 +28,7 @@ class CFM(nn.Module):
     def __init__(
         self,
         transformer: nn.Module,
-        sigma = 0.,
+        sigma = 3.4,
         odeint_kwargs: dict = dict(
             # atol = 1e-5,
             # rtol = 1e-5,
@@ -80,7 +80,7 @@ class CFM(nn.Module):
         # mel is x1
         x1 = inp
         # x0 is gaussian noise
-        x0 = torch.randn_like(x1)
+        x0 = torch.randn_like(x1) * self.sigma
 
         # time step
         time = torch.rand((batch,), dtype = dtype, device = self.device)
@@ -95,7 +95,7 @@ class CFM(nn.Module):
         drop_saln = random() < self.audio_drop_prob  # p_drop in voicebox paper
         # if random() < self.cond_drop_prob:  # p_uncond in voicebox paper
         #     drop_saln = True
-            
+
         # if want rigourously mask out padding, record in collate_fn in dataset.py, and pass in here
         # adding mask will use more memory, thus also need to adjust batchsampler with scaled down threshold for long sequences
         pred = self.transformer(x = φ, latent = latent, time = time, style_vector=style_vector, drop_saln = drop_saln)
@@ -137,7 +137,7 @@ class CFM(nn.Module):
         # noise input
         # to make sure batch inference result is same with different batch size, and for sure single inference
         # still some difference maybe due to convolutional layers
-        y0 = torch.randn((*latent.shape[:-1], 80), device=self.device)
+        y0 = torch.randn((*latent.shape[:-1], 80), device=self.device) * self.sigma
 
         t_start = 0
 
