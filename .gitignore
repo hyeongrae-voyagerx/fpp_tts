@@ -10,5 +10,4 @@ results*/
 __pycache__/
 *.pkl
 .gradio/
-.gitignore
 test*
