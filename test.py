@@ -26,7 +26,7 @@ class Inferencer:
 
     def load(self, fp, voc):
         fp_state_dict = torch.load(fp, weights_only=False)
-        self.fp.load_state_dict(fp_state_dict["model"])
+        self.fp.load_state_dict(fp_state_dict["model"], strict=False)
 
         voc_state_dict = torch.load(voc, weights_only=False)
         if "model" in voc_state_dict:
@@ -85,9 +85,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--fp_load", required=True, type=str)
     parser.add_argument("--voc_load", required=True, type=str)
-    parser.add_argument("--style", type=str, default="m_homeshopping_static.tensor")
+    # parser.add_argument("--style", type=str, default="m_homeshopping_static.tensor")
     # parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/8Happy반갑다NoneNoneNone.pt")
-    # parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/13Happy즐겁다NoneNoneNone.pt")
+    parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/13Happy즐겁다NoneNoneNone.pt")
 
     args = parser.parse_args()
     main(args)
