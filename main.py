@@ -32,7 +32,6 @@ class Trainer:
         self.num_train_step = trainer_config.num_train_step
         self.model_name = args.model
         os.makedirs(self.save_dir, exist_ok=True)
-        self.load(_start_weight)
     
     def train_step(self, data, step):
         self.model.train()
