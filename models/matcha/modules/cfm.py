@@ -3,10 +3,7 @@ from abc import ABC
 import torch
 import torch.nn.functional as F
 
-from matcha.models.components.decoder import Decoder
-from matcha.utils.pylogger import get_pylogger
-
-log = get_pylogger(__name__)
+from .decoder import Decoder
 
 
 class BASECFM(torch.nn.Module, ABC):
@@ -129,4 +126,4 @@ class CFM(BASECFM):
 
         in_channels = in_channels + (spk_emb_dim if use_saln else 0)
         # Just change the architecture of the estimator here
-        self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+        self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params._dict())

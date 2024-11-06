@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 @dataclass
 class EncoderParams:
@@ -18,7 +18,7 @@ class EncoderParams:
 class DurPredParams:
     filter_channels_dp: int = 256
     kernel_size: int = 1
-    p_dropout: int = 0.1
+    p_dropout: float = 0.1
 
 @dataclass
 class CFMParams:
@@ -34,6 +34,9 @@ class DecoderParams:
     num_mid_blocks: int = 2
     num_heads: int = 2
     act_fn: str = "snakebeta"
+
+    def _dict(self):
+        return asdict(self)
 
 @dataclass
 class ModelConfig:

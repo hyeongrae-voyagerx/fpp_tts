@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 
 from .monotonic_align import maximum_path
-from matcha import utils
 from .modules.cfm import CFM
 from .modules.text_encoder import TextEncoder
 from .modules.style_encoder import MelStyleEncoder
@@ -18,7 +17,6 @@ from .utils.model import (
     sequence_mask,
 )
 
-log = utils.get_pylogger(__name__)
 
 
 class MatchaTTS(nn.Module):
@@ -52,7 +50,7 @@ class MatchaTTS(nn.Module):
 
         self.encoder = TextEncoder(
             model_cfg.encoder_params,
-            model_cfg.duration_predictor_params,
+            model_cfg.dur_pred_params,
             model_cfg.n_vocab,
             model_cfg.use_saln,
             spk_emb_dim=128,
@@ -61,7 +59,7 @@ class MatchaTTS(nn.Module):
         self.decoder = CFM(
             in_channels=2*model_cfg.encoder_params.n_feats,
             out_channel=model_cfg.encoder_params.n_feats,
-            cfm_params=model_cfg.cfm_cfg,
+            cfm_params=model_cfg.cfm_params,
             decoder_params=model_cfg.decoder_params,
             use_saln=model_cfg.use_saln,
             spk_emb_dim=128,
@@ -239,3 +237,20 @@ class MatchaTTS(nn.Module):
             prior_loss = 0
 
         return dur_loss, prior_loss, diff_loss, attn
+    
+    def training_step(self, batch, idx):
+        x, y = self.parse_batch(batch)
+
+        y_pred = self(x)
+        
+
+
+    def update_data_statistics(self, data_statistics):
+        if data_statistics is None:
+            data_statistics = {
+                "mel_mean": 0.0,
+                "mel_std": 1.0,
+            }
+
+        self.register_buffer("mel_mean", torch.tensor(data_statistics["mel_mean"]))
+        self.register_buffer("mel_std", torch.tensor(data_statistics["mel_std"]))

@@ -6,10 +6,9 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-import matcha.utils as utils
-from matcha.utils.model import sequence_mask
 
-log = utils.get_pylogger(__name__)
+from ..utils.model import sequence_mask
+
 
 
 class LayerNorm(nn.Module):
@@ -339,7 +338,7 @@ class TextEncoder(nn.Module):
         self.n_feats = encoder_params.n_feats
         self.n_channels = encoder_params.n_channels
         self.spk_emb_dim = spk_emb_dim
-        self.n_spks = n_spks
+        self.use_saln = use_saln
 
         self.emb = torch.nn.Embedding(n_vocab, self.n_channels)
         torch.nn.init.normal_(self.emb.weight, 0.0, self.n_channels**-0.5)
@@ -357,7 +356,7 @@ class TextEncoder(nn.Module):
             self.prenet = lambda x, x_mask: x
 
         self.encoder = Encoder(
-            encoder_params.n_channels + (spk_emb_dim if n_spks > 1 else 0),
+            encoder_params.n_channels + (spk_emb_dim if use_saln else 0),
             encoder_params.filter_channels,
             encoder_params.n_heads,
             encoder_params.n_layers,
@@ -365,9 +364,9 @@ class TextEncoder(nn.Module):
             encoder_params.p_dropout,
         )
 
-        self.proj_m = torch.nn.Conv1d(self.n_channels + (spk_emb_dim if n_spks > 1 else 0), self.n_feats, 1)
+        self.proj_m = torch.nn.Conv1d(self.n_channels + (spk_emb_dim if use_saln else 0), self.n_feats, 1)
         self.proj_w = DurationPredictor(
-            self.n_channels + (spk_emb_dim if n_spks > 1 else 0),
+            self.n_channels + (spk_emb_dim if use_saln else 0),
             duration_predictor_params.filter_channels_dp,
             duration_predictor_params.kernel_size,
             duration_predictor_params.p_dropout,
