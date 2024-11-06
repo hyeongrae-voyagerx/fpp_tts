@@ -137,8 +137,8 @@ class TemporalPredictor(nn.Module):
         if self.reverse_pe:
             pos_seq = torch.arange(enc_out.shape[1], device=enc_out.device, dtype=enc_out.dtype)
             pe = self.pe(pos_seq).squeeze()
-            pos_seq = pos_seq * enc_out_mask.squeeze()
-            pos_seq = (pos_seq.amax(1)[:, None] - pos_seq) * enc_out_mask.squeeze()
+            pos_seq = pos_seq * enc_out_mask[..., 0]
+            pos_seq = (pos_seq.amax(1)[:, None] - pos_seq) * enc_out_mask[..., 0]
             pe = pe[pos_seq.to(torch.long)]
             enc_out = torch.cat((enc_out, pe), -1)
         out = enc_out * enc_out_mask

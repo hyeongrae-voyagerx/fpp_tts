@@ -7,20 +7,22 @@ import argparse
 from configs import get_configs
 from models import get_model
 from datasets import get_dataloaders
-from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio
+from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio, neptune_init
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-952/last.ckpt"
-_start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
-# _start_weight = "results3/latest_1935p.pt"
+# _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
+_start_weight = "results1/latest_bi_pt.pt"
+
+npt_prj_name = "v6x/fp-pitch"
+npt_exp_name = None
 
 class Trainer:
     def __init__(self, args):
         self.logger = DummyLogger()
         model_config, trainer_config, data_config = get_configs(args.model)
         self.dataloaders = get_dataloaders(data_config)
-        self.model = get_model(model_config=model_config, load=trainer_config.load).to(device=_device)
-        # self.load_baseline_fp()
+        self.model = get_model(model_config=model_config).to(device=_device)
         if getattr(trainer_config, "ema", False):
             self.ema = EMA(self.model, decay=0.999)
 
@@ -41,14 +43,14 @@ class Trainer:
             if data[i] is None:
                 continue
             data[i] = data[i].to(device=_device, non_blocking=True)
-        try:
-            model_out = self.model.training_step(data, step)
-        except KeyboardInterrupt:
-            breakpoint()
-        except:
-            print("piui")
-            loss.add(0, "loss")
-            return loss
+        # try:
+        model_out = self.model.training_step(data, step)
+        # except KeyboardInterrupt:
+        #     breakpoint()
+        # except:
+        #     print("piui")
+        #     loss.add(0, "loss")
+        #     return loss
         model_out.pop("loss")
         for item in filter(lambda x: "loss" in x, model_out):
             loss.add(model_out[item], item)
@@ -96,7 +98,7 @@ class Trainer:
 
     def load_baseline_fp(self):
         if osp.exists(_start_weight):
-            state_dict = torch.load(_start_weight, weights_only=False)["state_dict"]
+            state_dict = torch.load(_start_weight, weights_only=False)["model"]#["state_dict"]
         else:
             print(f"| Fail to load {_start_weight}, just use last.ckpt in the project directory")
             state_dict = torch.load("last.ckpt", weights_only=False)["state_dict"]

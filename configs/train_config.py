@@ -20,7 +20,8 @@ class TrainerConfig:
         return cls(
             use_ema = False,
             ckpt_every = 1000,
-            num_train_step = 2_000_000
+            num_train_step = 2_000_000,
+            best_loss_key = "mel_loss"
         )
     
     @classmethod

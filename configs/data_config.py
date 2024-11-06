@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 @dataclass
 class DataConfig:
@@ -60,8 +60,8 @@ class DataConfig:
                     "data_dir": "/home/hyeongrae/data/m_homeshopping/"
                 },
                 "dataloader_kwargs": {
-                    "batch_size": 32,
-                    "num_workers": 32,
+                    "batch_size": 16,
+                    "num_workers": 16,
                     "drop_last": True,
                 }
             },
@@ -71,7 +71,7 @@ class DataConfig:
                 },
                 "dataloader_kwargs": {
                     "batch_size": 32,
-                    "num_workers": 32,
+                    "num_workers": 16,
                     "drop_last": True,
                 }
             }

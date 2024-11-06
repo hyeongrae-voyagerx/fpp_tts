@@ -38,17 +38,17 @@ class ModelConfig:
 
     c_mel: int = 45
 
-    opts: List = field(default_factory=lambda: ["AdamW", "AdamW"])
-    lrs: List = field(default_factory=lambda: [2e-4, 2e-4])
-    opt_args: List = field(
-        default_factory=lambda: ['{"betas": (0.8, 0.99)}', '{"betas": (0.8, 0.99)}']
-    )
-    # Leave the params as an empy string to
-    params: List = field(default_factory=lambda: [".gen", [".mrd", ".mpd"]])
+    # opts: List = field(default_factory=lambda: ["AdamW", "AdamW"])
+    # lrs: List = field(default_factory=lambda: [2e-4, 2e-4])
+    # opt_args: List = field(
+    #     default_factory=lambda: ['{"betas": (0.8, 0.99)}', '{"betas": (0.8, 0.99)}']
+    # )
+    # # Leave the params as an empy string to
+    # params: List = field(default_factory=lambda: [".gen", [".mrd", ".mpd"]])
 
-    # TODO: Support multiple schedulers
-    sch: Optional[str] = "LinearLR"
-    sch_args: dict = field(default_factory=lambda: {"start_factor": 0.0001, "total_iters": 1000})
+    # # TODO: Support multiple schedulers
+    # sch: Optional[str] = "LinearLR"
+    # sch_args: dict = field(default_factory=lambda: {"start_factor": 0.0001, "total_iters": 1000})
 
 
 def register_configs() -> None:

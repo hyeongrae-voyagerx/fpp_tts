@@ -12,7 +12,7 @@ class Config:
 
     def __post_init__(self):
         module = import_module(f".{self.model_name}_config", "configs")
-        self.model_config = getattr(module, "ModelConfig")
+        self.model_config = getattr(module, "ModelConfig")()
         self.model_config.name = self.model_name
 
     def __getitem__(self, key):

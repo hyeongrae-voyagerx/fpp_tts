@@ -13,8 +13,8 @@ _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Inferencer:
     def __init__(self, args):
-        # fp_config, _, _ = get_configs("fastpitch")
-        fp_config, _, _ = get_configs("fpcfm")
+        fp_config, _, _ = get_configs("fastpitch")
+        # fp_config, _, _ = get_configs("fpcfm")
         voc_config, _, _ = get_configs("bigvgan")
 
         self.fp = get_model(model_config=fp_config).to(device=_device)
@@ -86,8 +86,8 @@ if __name__ == "__main__":
     parser.add_argument("--fp_load", required=True, type=str)
     parser.add_argument("--voc_load", required=True, type=str)
     # parser.add_argument("--style", type=str, default="m_homeshopping_static.tensor")
-    # parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/8Happy반갑다NoneNoneNone.pt")
-    parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/13Happy즐겁다NoneNoneNone.pt")
+    parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/8Happy반갑다NoneNoneNone.pt")
+    # parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/13Happy즐겁다NoneNoneNone.pt")
 
     args = parser.parse_args()
     main(args)
