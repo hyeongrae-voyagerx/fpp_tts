@@ -31,6 +31,7 @@ class CharacteristicDataset:
             pitch_path=osp.join(data_dir, file).replace(".wav", ".pitch")
             # self.save_pitch(wav, pitch_path)
             self.dataset.append({"wav": wav, "text": text, "pitch": normalize_pitch(torch.load(pitch_path, weights_only=False))})
+            print(f"\r | {pitch_path}", end="")
         
         global static_mel
         static_mel = get_mel(self.dataset[0]["wav"][None])

@@ -57,7 +57,7 @@ class DataConfig:
             name = "characteristic",
             train_kwargs = {
                 "dataset_kwargs": {
-                    "data_dir": "/home/hyeongrae/data/m_homeshopping/"
+                    "data_dir": "/home/hyeongrae/data/f_north/"
                 },
                 "dataloader_kwargs": {
                     "batch_size": 16,
@@ -67,7 +67,7 @@ class DataConfig:
             },
             valid_kwargs = {
                 "dataset_kwargs": {
-                    "data_dir": "/home/hyeongrae/data/m_homeshopping/"
+                    "data_dir": "/home/hyeongrae/data/f_north/"
                 },
                 "dataloader_kwargs": {
                     "batch_size": 32,

@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ModelConfig:
+    project_name: str = "v6x/fp-pitch"
+    exp_name: None | str = None
+    resume: None | str = None
     n_mel_channels: int = 80
     max_seq_len: int = 2048
 

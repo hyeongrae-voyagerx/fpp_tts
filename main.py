@@ -7,20 +7,17 @@ import argparse
 from configs import get_configs
 from models import get_model
 from datasets import get_dataloaders
-from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio, neptune_init
+from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio, NeptuneLogger
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-952/last.ckpt"
 # _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
 _start_weight = "results1/latest_bi_pt.pt"
 
-npt_prj_name = "v6x/fp-pitch"
-npt_exp_name = None
-
 class Trainer:
     def __init__(self, args):
-        self.logger = DummyLogger()
         model_config, trainer_config, data_config = get_configs(args.model)
+        self.logger = NeptuneLogger(model_config) if not args.debug else DummyLogger()
         self.dataloaders = get_dataloaders(data_config)
         self.model = get_model(model_config=model_config).to(device=_device)
         if getattr(trainer_config, "ema", False):
@@ -35,6 +32,7 @@ class Trainer:
         self.num_train_step = trainer_config.num_train_step
         self.model_name = args.model
         os.makedirs(self.save_dir, exist_ok=True)
+        self.load(_start_weight)
     
     def train_step(self, data, step):
         self.model.train()
@@ -43,14 +41,14 @@ class Trainer:
             if data[i] is None:
                 continue
             data[i] = data[i].to(device=_device, non_blocking=True)
-        # try:
-        model_out = self.model.training_step(data, step)
-        # except KeyboardInterrupt:
-        #     breakpoint()
-        # except:
-        #     print("piui")
-        #     loss.add(0, "loss")
-        #     return loss
+        try:
+            model_out = self.model.training_step(data, step)
+        except KeyboardInterrupt:
+            breakpoint()
+        except:
+            print("piui")
+            loss.add(0, "loss")
+            return loss
         model_out.pop("loss")
         for item in filter(lambda x: "loss" in x, model_out):
             loss.add(model_out[item], item)
@@ -66,7 +64,7 @@ class Trainer:
             for step, data in enumerate(self.dataloaders["train"], self.step):
                 loss = self.train_step(data, step)
                 for k, v in loss.loss_items.items():
-                    self.logger.add_scalar(f"{k}/train", v, step)
+                    self.logger.log(f"training/{k}", v)
                 print(f"\r | [{step:06d}] | loss = {loss}", end="")
                 
                 self.step = step
@@ -86,6 +84,8 @@ class Trainer:
         }
         # ckpt_path = os.path.join(self.save_dir, f"ckpt_{self.step}.pt")
         ckpt_path = os.path.join(self.save_dir, f"latest.pt")
+        self.logger.upload(f"training/model/checkpoints/best.pt", state_dict)
+        self.logger.log("training/model/best_model_path", "/home/hyeongrae/fpp_tts/cache/training/model/checkpoints/best.pt", override=False)
         torch.save(state_dict, ckpt_path)
 
     def load(self, path=None, load_step=False):
@@ -94,7 +94,7 @@ class Trainer:
         self.model.load_state_dict(state_dict["model"])
         if hasattr(self, "ema"):
             self.ema.shadow = state_dict["ema"]
-        self.step = state_dict["step"] if load_step else 0
+        self.step = state_dict["step"] if load_step else 1
 
     def load_baseline_fp(self):
         if osp.exists(_start_weight):

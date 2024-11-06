@@ -23,7 +23,8 @@ def get_model(model_config):
 
     if hasattr(model_config, "resume") and model_config.resume:
         weight_path = load_weight(model_config)
-        w = torch.load(weight_path, weights_only=False)
-        model.load_state_dict(w["model"])
-        print(f"Load Pretrained weight from: {model_config.resume}")
+        if weight_path is not None:
+            w = torch.load(weight_path, weights_only=False)
+            model.load_state_dict(w["model"])
+            print(f"Load Pretrained weight from: {model_config.resume}")
     return model

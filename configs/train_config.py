@@ -19,7 +19,7 @@ class TrainerConfig:
     def fastpitch_char_base(cls):
         return cls(
             use_ema = False,
-            ckpt_every = 1000,
+            ckpt_every = 5000,
             num_train_step = 2_000_000,
             best_loss_key = "mel_loss"
         )

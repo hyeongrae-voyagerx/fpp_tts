@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import os
 import os.path as osp
 
-from .neptune import init as neptune_init
+from .neptune import NeptuneLogger
 
 def save_audio(audio: torch.Tensor, path="piui.wav", sr=22050):
     audio = audio.cpu().detach()
