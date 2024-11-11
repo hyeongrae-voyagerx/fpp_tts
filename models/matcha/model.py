@@ -4,6 +4,7 @@ import random
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 from .monotonic_align import maximum_path
 from .modules.cfm import CFM
@@ -57,7 +58,7 @@ class MatchaTTS(nn.Module):
         )
 
         self.decoder = CFM(
-            in_channels=2*model_cfg.encoder_params.n_feats,
+            in_channels=2*model_cfg.encoder_params.n_feats+128,
             out_channel=model_cfg.encoder_params.n_feats,
             cfm_params=model_cfg.cfm_params,
             decoder_params=model_cfg.decoder_params,
@@ -66,6 +67,8 @@ class MatchaTTS(nn.Module):
         )
 
         self.update_data_statistics(model_cfg.data_statistics)
+
+        self.opt = getattr(optim, model_cfg.opt)(self.parameters(), **model_cfg.opt_args)
 
     @torch.inference_mode()
     def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, length_scale=1.0):
@@ -105,12 +108,12 @@ class MatchaTTS(nn.Module):
         # For RTF computation
         t = dt.datetime.now()
 
-        if self.n_spks > 1:
-            # Get speaker embedding
-            spks = self.spk_emb(spks.long())
+        if self.use_saln:
+            style_mel_mask = self.get_mask_from_lens(style_mel_lengths)
+            style_vector = self.style_encoder(style_mel, style_mel_mask)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
+        mu_x, logw, x_mask = self.encoder(x, x_lengths, style_vector)
 
         w = torch.exp(logw) * x_mask
         w_ceil = torch.ceil(w) * length_scale
@@ -144,7 +147,7 @@ class MatchaTTS(nn.Module):
             "rtf": rtf,
         }
 
-    def forward(self, x, x_lengths, y, y_lengths, spks=None, out_size=None, cond=None, durations=None):
+    def forward(self, x, x_lengths, y, y_lengths, style_mel, style_mel_lengths, spks=None, out_size=None, cond=None, durations=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotinic Alignment Search (MAS).
@@ -165,16 +168,17 @@ class MatchaTTS(nn.Module):
             spks (torch.Tensor, optional): speaker ids.
                 shape: (batch_size,)
         """
-        if self.n_spks > 1:
-            # Get speaker embedding
-            spks = self.spk_emb(spks)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
+        if self.use_saln:
+            style_mel_mask = self.get_mask_from_lens(style_mel_lengths)
+            style_vector = self.style_encoder(style_mel, style_mel_mask)
+        mu_x, logw, x_mask = self.encoder(x, x_lengths, style_vector)
         y_max_length = y.shape[-1]
 
         y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+
 
         if self.use_precomputed_durations:
             attn = generate_path(durations.squeeze(1), attn_mask.squeeze(1))
@@ -228,7 +232,7 @@ class MatchaTTS(nn.Module):
         mu_y = mu_y.transpose(1, 2)
 
         # Compute loss of the decoder
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks, cond=cond)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, style_vector=style_vector, cond=cond)
 
         if self.prior_loss:
             prior_loss = torch.sum(0.5 * ((y - mu_y) ** 2 + math.log(2 * math.pi)) * y_mask)
@@ -238,11 +242,45 @@ class MatchaTTS(nn.Module):
 
         return dur_loss, prior_loss, diff_loss, attn
     
-    def training_step(self, batch, idx):
-        x, y = self.parse_batch(batch)
+    def training_step(self, batch, idx, do_train=True):
+        x, x_len, y, y_len, style_mel, style_mel_len = self.parse_batch(batch)
 
-        y_pred = self(x)
+        dur_loss, prior_loss, diff_loss, attn = self(
+            x=x,
+            x_lengths=x_len,
+            y=y,
+            y_lengths=y_len,
+            style_mel=style_mel,
+            style_mel_lengths=style_mel_len,
+        )
+
+        loss = dur_loss + prior_loss + diff_loss
+
+        if do_train:
+            self.opt.zero_grad()
+            loss.backward()
+            self.opt.step()
+            if hasattr(self, "sch"):
+                self.sch.step()
+
+        loss_dict = {
+            "dur_loss": dur_loss,
+            "prior_loss": prior_loss,
+            "diff_loss": diff_loss,
+            "loss": loss
+        }
+        return loss_dict
+
         
+    @staticmethod
+    def parse_batch(batch):
+        x, x_len = batch[0], batch[1]
+        y, y_len = batch[2], batch[3]
+        style_mel, style_mel_len = batch[4], batch[5]
+
+        return x, x_len, y, y_len, style_mel, style_mel_len
+
+
 
 
     def update_data_statistics(self, data_statistics):
@@ -254,3 +292,15 @@ class MatchaTTS(nn.Module):
 
         self.register_buffer("mel_mean", torch.tensor(data_statistics["mel_mean"]))
         self.register_buffer("mel_std", torch.tensor(data_statistics["mel_std"]))
+
+    @staticmethod
+    def get_mask_from_lens(lengths, max_len=None):
+        batch_size = lengths.shape[0]
+        if max_len is None:
+            max_len = torch.max(lengths)
+
+        ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).type_as(lengths)
+        mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
+        return mask
+    
+    

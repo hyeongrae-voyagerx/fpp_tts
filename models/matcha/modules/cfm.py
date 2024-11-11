@@ -81,7 +81,7 @@ class BASECFM(torch.nn.Module, ABC):
 
         return sol[-1]
 
-    def compute_loss(self, x1, mask, mu, spks=None, cond=None):
+    def compute_loss(self, x1, mask, mu, style_vector=None, cond=None):
         """Computes diffusion loss
 
         Args:
@@ -108,8 +108,8 @@ class BASECFM(torch.nn.Module, ABC):
 
         y = (1 - (1 - self.sigma_min) * t) * z + t * x1
         u = x1 - (1 - self.sigma_min) * z
-
-        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks), u, reduction="sum") / (
+        
+        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), style_vector), u, reduction="sum") / (
             torch.sum(mask) * u.shape[1]
         )
         return loss, y
@@ -124,6 +124,6 @@ class CFM(BASECFM):
             spk_emb_dim=spk_emb_dim,
         )
 
-        in_channels = in_channels + (spk_emb_dim if use_saln else 0)
+        in_channels = in_channels
         # Just change the architecture of the estimator here
         self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params._dict())

@@ -68,7 +68,7 @@ class Trainer:
                 
                 self.step = step
                 if step % self.ckpt_every == 0 or self.debug:
-                    avg_loss = self.infer()
+                    avg_loss = self.validate()
                     print(f"| val_loss = {avg_loss:.3f} (best = {self.loss_best:.3f})")
                     if not self.debug and avg_loss < self.loss_best:
                         self.loss_best = avg_loss
@@ -106,7 +106,7 @@ class Trainer:
 
     @EMA.ema_mode
     @torch.no_grad()
-    def infer(self):
+    def validate(self):
         print()
         self.model.eval()
         total_loss = 0

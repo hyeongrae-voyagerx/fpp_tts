@@ -359,7 +359,7 @@ class Decoder(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, mask, mu, t, spks=None, cond=None):
+    def forward(self, x, mask, mu, t, style_vector=None, cond=None):
         """Forward pass of the UNet1DConditional model.
 
         Args:
@@ -379,12 +379,10 @@ class Decoder(nn.Module):
 
         t = self.time_embeddings(t)
         t = self.time_mlp(t)
-
         x = pack([x, mu], "b * t")[0]
-
-        if spks is not None:
-            spks = repeat(spks, "b c -> b c t", t=x.shape[-1])
-            x = pack([x, spks], "b * t")[0]
+        
+        style_vector = repeat(style_vector.squeeze(1), "b c -> b c t", t=x.shape[-1])
+        x = pack([x, style_vector], "b * t")[0]
 
         hiddens = []
         masks = [mask]
@@ -423,6 +421,8 @@ class Decoder(nn.Module):
 
         for resnet, transformer_blocks, upsample in self.up_blocks:
             mask_up = masks.pop()
+            if hiddens[-1].shape[-1] != x.shape[-1]:
+                x = x[..., :-1]
             x = resnet(pack([x, hiddens.pop()], "b * t")[0], mask_up, t)
             x = rearrange(x, "b c t -> b t c")
             mask_up = rearrange(mask_up, "b 1 t -> b t")

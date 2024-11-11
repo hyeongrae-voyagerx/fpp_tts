@@ -298,7 +298,7 @@ class Encoder(nn.Module):
         self.norm_layers_2 = torch.nn.ModuleList()
         for _ in range(self.n_layers):
             self.attn_layers.append(MultiHeadAttention(hidden_channels, hidden_channels, n_heads, p_dropout=p_dropout))
-            self.norm_layers_1.append(LayerNorm(hidden_channels))
+            self.norm_layers_1.append(StyleAdaptiveLayerNorm(hidden_channels, 128))
             self.ffn_layers.append(
                 FFN(
                     hidden_channels,
@@ -308,18 +308,18 @@ class Encoder(nn.Module):
                     p_dropout=p_dropout,
                 )
             )
-            self.norm_layers_2.append(LayerNorm(hidden_channels))
+            self.norm_layers_2.append(StyleAdaptiveLayerNorm(hidden_channels, 128))
 
-    def forward(self, x, x_mask):
+    def forward(self, x, x_mask, style_vector):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         for i in range(self.n_layers):
             x = x * x_mask
             y = self.attn_layers[i](x, x, attn_mask)
             y = self.drop(y)
-            x = self.norm_layers_1[i](x + y)
+            x = self.norm_layers_1[i](x + y, style_vector)
             y = self.ffn_layers[i](x, x_mask)
             y = self.drop(y)
-            x = self.norm_layers_2[i](x + y)
+            x = self.norm_layers_2[i](x + y, style_vector)
         x = x * x_mask
         return x
 
@@ -356,7 +356,7 @@ class TextEncoder(nn.Module):
             self.prenet = lambda x, x_mask: x
 
         self.encoder = Encoder(
-            encoder_params.n_channels + (spk_emb_dim if use_saln else 0),
+            encoder_params.n_channels,
             encoder_params.filter_channels,
             encoder_params.n_heads,
             encoder_params.n_layers,
@@ -364,15 +364,15 @@ class TextEncoder(nn.Module):
             encoder_params.p_dropout,
         )
 
-        self.proj_m = torch.nn.Conv1d(self.n_channels + (spk_emb_dim if use_saln else 0), self.n_feats, 1)
+        self.proj_m = torch.nn.Conv1d(self.n_channels, self.n_feats, 1)
         self.proj_w = DurationPredictor(
-            self.n_channels + (spk_emb_dim if use_saln else 0),
+            self.n_channels,
             duration_predictor_params.filter_channels_dp,
             duration_predictor_params.kernel_size,
             duration_predictor_params.p_dropout,
         )
 
-    def forward(self, x, x_lengths, spks=None):
+    def forward(self, x, x_lengths, style_vector):
         """Run forward pass to the transformer based encoder and duration predictor
 
         Args:
@@ -396,12 +396,39 @@ class TextEncoder(nn.Module):
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
 
         x = self.prenet(x, x_mask)
-        if self.n_spks > 1:
-            x = torch.cat([x, spks.unsqueeze(-1).repeat(1, 1, x.shape[-1])], dim=1)
-        x = self.encoder(x, x_mask)
+        x = self.encoder(x, x_mask, style_vector)
         mu = self.proj_m(x) * x_mask
 
         x_dp = torch.detach(x)
         logw = self.proj_w(x_dp, x_mask)
 
         return mu, logw, x_mask
+
+class StyleAdaptiveLayerNorm(nn.Module):
+    def __init__(self, in_channel, style_dim):
+        super(StyleAdaptiveLayerNorm, self).__init__()
+        self.in_channel = in_channel
+        self.norm = nn.LayerNorm(in_channel, elementwise_affine=False)
+
+        self.style = AffineLinear(style_dim, in_channel * 2)
+        self.style.affine.bias.data[:in_channel] = 1
+        self.style.affine.bias.data[in_channel:] = 0
+
+    def forward(self, x, style_code):
+        # style
+        style = self.style(style_code)
+        gamma, beta = style.chunk(2, dim=-1)
+        x = x.permute(0, 2, 1)
+        out = self.norm(x)
+        out = gamma * out + beta
+        out = out.permute(0, 2, 1)
+        return out
+
+class AffineLinear(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super(AffineLinear, self).__init__()
+        affine = nn.Linear(in_dim, out_dim)
+        self.affine = affine
+
+    def forward(self, input):
+        return self.affine(input)

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field, asdict
+from frozendict import frozendict
 
 @dataclass
 class EncoderParams:
@@ -40,6 +41,10 @@ class DecoderParams:
 
 @dataclass
 class ModelConfig:
+    project_name: str = "v6x/fp-pitch"
+    exp_name: None | str = None
+    resume: None | str = None
+    
     n_vocab: int = 200
     use_saln: bool = True
     use_prior_loss: bool = True
@@ -49,3 +54,5 @@ class ModelConfig:
     decoder_params: DecoderParams = field(default_factory=DecoderParams)
     data_statistics: None | tuple[float] = None # (mean, std)
     use_precomputed_durations: bool = False
+    opt: str = "Adam"
+    opt_args: frozendict = frozendict(lr=1e-4, betas=(0.9, 0.99))

@@ -86,6 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("--fp_load", required=True, type=str)
     parser.add_argument("--voc_load", required=True, type=str)
     # parser.add_argument("--style", type=str, default="m_homeshopping_static.tensor")
+    # parser.add_argument("--style", type=str, default="f_north_static.tensor")
     parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/8Happy반갑다NoneNoneNone.pt")
     # parser.add_argument("--style", type=str, default="/data/tts/korean_va/static_mels/13Happy즐겁다NoneNoneNone.pt")
 

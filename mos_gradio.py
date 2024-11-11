@@ -6,8 +6,8 @@ from datetime import datetime
 
 # audio_list_f = glob("test/f_*.wav")
 # audio_list_f.sort(key=lambda x: x[::-1])
-audio_list_m = glob("test1/m_*.wav")
-audio_list_m.sort(key=lambda x: x.split("_")[2])
+audio_list_m = glob("mos_wav/*.wav")
+audio_list_m.sort()
 data = []
 # for i in range(0, len(audio_list_f), 2):
 #     d = [audio_list_f[i], audio_list_f[i+1]]
@@ -23,15 +23,15 @@ def who_win(sample, pref):
     elif pref == 2: idx = 1
     else: return "draw"
 
-    if "base" in sample[idx]: return "baseline"
-    if "gen" in sample[idx]: return "gen"
+    if "genb" in sample[idx]: return "uni_pos"
+    if "gen" in sample[idx]: return "bi_pos"
 
 def create_interface(audio_list):
     def report(*prefs):
         result = defaultdict(int)
         for p, d in zip(prefs, data):
             result[who_win(d, p)] += 1
-        filename = "mos_result/" + format(datetime.now()).replace(" ", "_").replace(".", "_") + ".txt"
+        filename = "mos_result_unid_vs_bid/" + format(datetime.now()).replace(" ", "_").replace(".", "_") + ".txt"
         with open(filename, "w") as fw:
             fw.write(f"result: {dict(result)}")
         return f"result: {dict(result)} / 감사합니다!"
@@ -58,6 +58,6 @@ def create_interface(audio_list):
         submit_button = gr.Button("제출")
         submit_button.click(report, inputs=prefs, outputs=output)
 
-    demo.launch(server_name="0.0.0.0")
+    demo.launch(server_name="0.0.0.0", share=True)
 
 create_interface(data)

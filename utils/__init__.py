@@ -21,6 +21,9 @@ class DummyLogger:
     def add_audio(self, *args, **kwargs):
         pass
 
+    def log(self, *args, **kwargs):
+        pass
+
 class LossFormatter:
     def __init__(self):
         self.losses = {}
