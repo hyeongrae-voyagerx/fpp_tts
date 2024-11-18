@@ -154,8 +154,8 @@ class DataConfig:
                     "data_dir": "/data/tts/korean_va/train/"
                 },
                 "dataloader_kwargs": {
-                    "batch_size": 32,
-                    "num_workers": 16,
+                    "batch_size": 64,
+                    "num_workers": 32,
                     "drop_last": True,
                 }
             },

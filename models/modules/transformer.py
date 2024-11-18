@@ -37,7 +37,6 @@ class PositionalEmbedding(nn.Module):
         else:
             return pos_emb[None, :, :]
 
-
 class PositionwiseConvFF(nn.Module):
     def __init__(self, d_model, d_inner, kernel_size, dropout, pre_lnorm=False):
         super(PositionwiseConvFF, self).__init__()

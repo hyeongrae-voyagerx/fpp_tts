@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ModelConfig:
-    project_name: str = "v6x/fp-pitch"
+    project_name: str = "v6x/tts"
     exp_name: None | str = None
     resume: None | str = None
     n_mel_channels: int = 80
@@ -80,7 +80,7 @@ class ModelConfig:
     semicolon_encoding: int = 7
 
     use_mel_loss: bool = True
-    loss_to_train: tuple = ("mel", "attn", "dur", "pitch", "energy") # ("pitch", ) # Choice(s) from ("mel", "attn", "dur", "pitch", "energy")
+    loss_to_train: tuple = ("pitch", ) # Choice(s) from ("enc", "mel", "attn", "dur", "pitch", "energy")
 
     optimizers: tuple[str] = ("Adam", )
     lrs: tuple[float] = (1e-5, )

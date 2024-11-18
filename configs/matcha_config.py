@@ -53,6 +53,6 @@ class ModelConfig:
     cfm_params: CFMParams = field(default_factory=CFMParams)
     decoder_params: DecoderParams = field(default_factory=DecoderParams)
     data_statistics: None | tuple[float] = None # (mean, std)
-    use_precomputed_durations: bool = False
+    aligner: str = "alf"
     opt: str = "Adam"
     opt_args: frozendict = frozendict(lr=1e-4, betas=(0.9, 0.99))

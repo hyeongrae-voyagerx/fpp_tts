@@ -104,16 +104,14 @@ class TemporalPredictor(nn.Module):
 
     def __init__(
         self, input_size, filter_size, kernel_size, dropout, n_layers=2, n_predictions=1, 
-        forward_pe=False, reverse_pe=False
+        forward_pe=False
     ):
         super(TemporalPredictor, self).__init__()
 
         # if n_vocab is not None:
         #     self.emb = nn.Embedding(n_vocab, input_size)
-        if forward_pe or reverse_pe:
+        if forward_pe:
             self.pe = PositionalEmbedding(input_size)
-        if reverse_pe:
-            input_size *=2
         self.layers = nn.Sequential(
             *[
                 ConvReLUNorm(
@@ -128,19 +126,11 @@ class TemporalPredictor(nn.Module):
         self.n_predictions = n_predictions
         self.fc = nn.Linear(filter_size, self.n_predictions, bias=True)
         self.forward_pe = forward_pe
-        self.reverse_pe = reverse_pe
 
     def forward(self, enc_out, enc_out_mask):
         if self.forward_pe:
             pos_seq = torch.arange(enc_out.shape[1], device=enc_out.device, dtype=enc_out.dtype)
             enc_out = enc_out + self.pe(pos_seq) * enc_out_mask
-        if self.reverse_pe:
-            pos_seq = torch.arange(enc_out.shape[1], device=enc_out.device, dtype=enc_out.dtype)
-            pe = self.pe(pos_seq).squeeze()
-            pos_seq = pos_seq * enc_out_mask[..., 0]
-            pos_seq = (pos_seq.amax(1)[:, None] - pos_seq) * enc_out_mask[..., 0]
-            pe = pe[pos_seq.to(torch.long)]
-            enc_out = torch.cat((enc_out, pe), -1)
         out = enc_out * enc_out_mask
         out = self.layers(out.transpose(1, 2)).transpose(1, 2)
         out = self.fc(out) * enc_out_mask
@@ -192,7 +182,6 @@ class FastPitch(nn.Module):
             dropout=self.model_cfg.dur_pred_dropout,
             n_layers=self.model_cfg.dur_pred_n_layers,
             forward_pe=False,
-            reverse_pe=False,
         )
 
         self.decoder = FFTransformer(
@@ -218,7 +207,6 @@ class FastPitch(nn.Module):
             n_layers=self.model_cfg.pitch_pred_n_layers,
             n_predictions=self.model_cfg.pitch_cond_formants,
             forward_pe=True,
-            reverse_pe=True,
         )
 
         self.pitch_emb = nn.Conv1d(
@@ -241,8 +229,7 @@ class FastPitch(nn.Module):
                 dropout=self.model_cfg.energy_pred_dropout,
                 n_layers=self.model_cfg.energy_pred_n_layers,
                 n_predictions=1,
-                forward_pe=False,
-                reverse_pe=False
+                forward_pe=False
             )
 
             self.energy_emb = nn.Conv1d(
@@ -796,12 +783,13 @@ class FastPitch(nn.Module):
         return meta
     
     def freeze_by_loss(self, loss_to_train: tuple):
-        if set(loss_to_train) == {"mel", "attn", "dur", "pitch", "energy"}:
+        if set(loss_to_train) == {"enc", "mel", "attn", "dur", "pitch", "energy"}:
             return
         
         for p in self.parameters(): p.requires_grad=False
-        if "pitch" in loss_to_train:
+        if "enc" in loss_to_train:
             for p in self.encoder.parameters(): p.requires_grad=True
+        if "pitch" in loss_to_train:
             for p in self.pitch_predictor.parameters(): p.requires_grad=True
         if "dur" in loss_to_train:
             for p in self.duration_predictor.parameters(): p.requires_grad=True

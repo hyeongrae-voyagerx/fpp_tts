@@ -27,7 +27,7 @@ class BASECFM(torch.nn.Module, ABC):
         self.estimator = None
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, style=None, cond=None):
         """Forward diffusion
 
         Args:
@@ -47,9 +47,9 @@ class BASECFM(torch.nn.Module, ABC):
         """
         z = torch.randn_like(mu) * temperature
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device)
-        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond)
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, style=style, cond=cond)
 
-    def solve_euler(self, x, t_span, mu, mask, spks, cond):
+    def solve_euler(self, x, t_span, mu, mask, style, cond):
         """
         Fixed euler solver for ODEs.
         Args:
@@ -71,7 +71,7 @@ class BASECFM(torch.nn.Module, ABC):
         sol = []
 
         for step in range(1, len(t_span)):
-            dphi_dt = self.estimator(x, mask, mu, t, spks, cond)
+            dphi_dt = self.estimator(x, mask, mu, t, style, cond)
 
             x = x + dt * dphi_dt
             t = t + dt

@@ -11,8 +11,8 @@ from utils import DummyLogger, LossFormatter, EMA, draw_mel_pitch, save_audio, N
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-952/last.ckpt"
-# _start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
-_start_weight = "results1/latest_bi_pt.pt"
+_start_weight = "/home/hyeongrae/vrew_tts/training/fast_pitch_bigv_gan/cache/TTS-1935/last.ckpt"
+# _start_weight = "results1/latest_bi_pt.pt"
 
 class Trainer:
     def __init__(self, args):
@@ -62,8 +62,9 @@ class Trainer:
         while self.step < self.num_train_step:
             for step, data in enumerate(self.dataloaders["train"], self.step):
                 loss = self.train_step(data, step)
-                for k, v in loss.loss_items.items():
-                    self.logger.log(f"training/{k}", v)
+                if step % 50 == 0:
+                    for k, v in loss.loss_items.items():
+                        self.logger.log(f"training/{k}", v)
                 print(f"\r | [{step:06d}] | loss = {loss}", end="")
                 
                 self.step = step
@@ -77,14 +78,14 @@ class Trainer:
 
     def save(self):
         state_dict = {
-            'model': self.model.state_dict(),
+            'state_dict': self.model.state_dict(),
             'ema': self.ema.shadow if hasattr(self, "ema") else None,
             'step': self.step
         }
         # ckpt_path = os.path.join(self.save_dir, f"ckpt_{self.step}.pt")
         ckpt_path = os.path.join(self.save_dir, f"latest.pt")
-        self.logger.upload(f"training/model/checkpoints/best.pt", state_dict)
-        self.logger.log("training/model/best_model_path", "/home/hyeongrae/fpp_tts/cache/training/model/checkpoints/best.pt", override=False)
+        self.logger.upload(f"training/model/checkpoints/best", state_dict)
+        self.logger.log("training/model/best_model_path", "/home/hyeongrae/fpp_tts/cache/training/model/checkpoints/best", override=False)
         torch.save(state_dict, ckpt_path)
 
     def load(self, path=None, load_step=False):
@@ -97,7 +98,7 @@ class Trainer:
 
     def load_baseline_fp(self):
         if osp.exists(_start_weight):
-            state_dict = torch.load(_start_weight, weights_only=False)["model"]#["state_dict"]
+            state_dict = torch.load(_start_weight, weights_only=False)["state_dict"]
         else:
             print(f"| Fail to load {_start_weight}, just use last.ckpt in the project directory")
             state_dict = torch.load("last.ckpt", weights_only=False)["state_dict"]
@@ -116,6 +117,8 @@ class Trainer:
                     continue
                 data[i] = data[i].to(device=_device, non_blocking=True)
             model_out = self.model.training_step(data, idx, do_train=False)
+            
+            
             total_loss += model_out[self.best_loss_key].item()
             avg_loss = total_loss / idx
             
@@ -123,6 +126,7 @@ class Trainer:
                 break
         # if avg_loss < self.loss_best:
         #     self.save_sample(data)
+        self.logger.log(f"validation/loss", avg_loss)
         return avg_loss
 
     @torch.no_grad()

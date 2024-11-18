@@ -21,7 +21,7 @@ def get_model(model_config):
     Model = _model_dict[model_config.name]
     model = Model(model_config)
 
-    if hasattr(model_config, "resume") and model_config.resume:
+    if getattr(model_config, "resume", False):
         weight_path = load_weight(model_config)
         if weight_path is not None:
             w = torch.load(weight_path, weights_only=False)

@@ -13,8 +13,7 @@ _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Inferencer:
     def __init__(self, args):
-        fp_config, _, _ = get_configs("fastpitch")
-        # fp_config, _, _ = get_configs("fpcfm")
+        fp_config, _, _ = get_configs(args.model)
         voc_config, _, _ = get_configs("bigvgan")
 
         self.fp = get_model(model_config=fp_config).to(device=_device)
@@ -26,7 +25,7 @@ class Inferencer:
 
     def load(self, fp, voc):
         fp_state_dict = torch.load(fp, weights_only=False)
-        self.fp.load_state_dict(fp_state_dict["model"], strict=False)
+        self.fp.load_state_dict(fp_state_dict["state_dict"], strict=True)
 
         voc_state_dict = torch.load(voc, weights_only=False)
         if "model" in voc_state_dict:
@@ -83,6 +82,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", required=True, type=str)
     parser.add_argument("--fp_load", required=True, type=str)
     parser.add_argument("--voc_load", required=True, type=str)
     # parser.add_argument("--style", type=str, default="m_homeshopping_static.tensor")

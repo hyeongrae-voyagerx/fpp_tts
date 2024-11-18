@@ -66,7 +66,6 @@ class FastPitchLoss(nn.Module):
             attn_dur,
             attn_logprob,
         ) = model_out
-        # TODO: implement loss_to_train
         (mel_tgt, in_lens, out_lens) = targets
         mel_tgt.requires_grad = False
         # (B,H,T) => (B,T,H)
