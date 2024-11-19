@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-
+from ..modules.style_encoder import MelStyleEncoder
 from ..utils.model import sequence_mask
 
 
@@ -75,19 +75,19 @@ class DurationPredictor(nn.Module):
 
         self.drop = torch.nn.Dropout(p_dropout)
         self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
-        self.norm_1 = LayerNorm(filter_channels)
+        self.norm_1 = StyleAdaptiveLayerNorm(filter_channels, 128)
         self.conv_2 = torch.nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
-        self.norm_2 = LayerNorm(filter_channels)
+        self.norm_2 = StyleAdaptiveLayerNorm(filter_channels, 128)
         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
-    def forward(self, x, x_mask):
+    def forward(self, x, x_mask, style_vector):
         x = self.conv_1(x * x_mask)
         x = torch.relu(x)
-        x = self.norm_1(x)
+        x = self.norm_1(x, style_vector)
         x = self.drop(x)
         x = self.conv_2(x * x_mask)
         x = torch.relu(x)
-        x = self.norm_2(x)
+        x = self.norm_2(x, style_vector)
         x = self.drop(x)
         x = self.proj(x * x_mask)
         return x * x_mask
@@ -339,6 +339,8 @@ class TextEncoder(nn.Module):
         self.n_channels = encoder_params.n_channels
         self.spk_emb_dim = spk_emb_dim
         self.use_saln = use_saln
+        if use_saln:
+            self.style_encoder = MelStyleEncoder()
 
         self.emb = torch.nn.Embedding(n_vocab, self.n_channels)
         torch.nn.init.normal_(self.emb.weight, 0.0, self.n_channels**-0.5)
@@ -372,7 +374,7 @@ class TextEncoder(nn.Module):
             duration_predictor_params.p_dropout,
         )
 
-    def forward(self, x, x_lengths, style_vector):
+    def forward(self, x, x_lengths, style_mel=None, style_mel_length=None):
         """Run forward pass to the transformer based encoder and duration predictor
 
         Args:
@@ -391,6 +393,9 @@ class TextEncoder(nn.Module):
             x_mask (torch.Tensor): mask for the text input
                 shape: (batch_size, 1, max_text_length)
         """
+        if self.use_saln:
+            style_mel_mask = self.get_mask_from_lens(style_mel_length)
+            style_vector = self.style_encoder(style_mel, style_mel_mask)
         x = self.emb(x) * math.sqrt(self.n_channels)
         x = torch.transpose(x, 1, -1)
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
@@ -400,9 +405,19 @@ class TextEncoder(nn.Module):
         mu = self.proj_m(x) * x_mask
 
         x_dp = torch.detach(x)
-        logw = self.proj_w(x_dp, x_mask)
+        logw = self.proj_w(x_dp, x_mask, style_vector)
 
-        return mu, logw, x_mask
+        return mu, logw, x_mask, style_mel_mask
+
+    @staticmethod
+    def get_mask_from_lens(lengths, max_len=None):
+        batch_size = lengths.shape[0]
+        if max_len is None:
+            max_len = torch.max(lengths)
+
+        ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).type_as(lengths)
+        mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
+        return mask
 
 class StyleAdaptiveLayerNorm(nn.Module):
     def __init__(self, in_channel, style_dim):

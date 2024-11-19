@@ -31,7 +31,6 @@ def load_weight(model_config):
 def _get_weight_from_run(run):
     data = run.get_structure()
     if _getitem_nest(data, "training", "model", "best_model_path") is not None:
-        breakpoint()
         best_path_string = _fetch(data["training"]["model"]["best_model_path"])
         best_path = Path(best_path_string)
         cache_dir = best_path.parent.resolve()
@@ -114,7 +113,6 @@ def _fetch(item: neptune.attributes.series.series.Series | neptune.attributes.at
     elif isinstance(item, neptune.attributes.series.series.Series):
         return item.fetch_last()
     else:
-        breakpoint()
         raise TypeError(f"| Unknown type to fetch in neptune: {type(item)}")
 
 if __name__ == "__main__":
@@ -122,4 +120,3 @@ if __name__ == "__main__":
     logger = NeptuneLogger(model_config)
     wav, sr = torchaudio.load("piui.wav")
     logger.save_audio("wave.wav", wav, sr)
-    breakpoint()

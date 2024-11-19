@@ -10,7 +10,6 @@ import torch.optim as optim
 from .monotonic_align import maximum_path
 from .modules.cfm import CFM
 from .modules.text_encoder import TextEncoder
-from .modules.style_encoder import MelStyleEncoder
 from .utils.model import (
     denormalize,
     duration_loss,
@@ -57,11 +56,6 @@ class MatchaTTS(nn.Module):
             self.bin_loss = AttentionBinarizationLoss()
             self.ctc_loss = AttentionCTCLoss()
 
-
-        if model_cfg.use_saln:
-            self.style_encoder = MelStyleEncoder()
-        self.use_saln = model_cfg.use_saln
-
         self.encoder = TextEncoder(
             model_cfg.encoder_params,
             model_cfg.dur_pred_params,
@@ -71,7 +65,7 @@ class MatchaTTS(nn.Module):
         )
 
         self.decoder = CFM(
-            in_channels=2*model_cfg.encoder_params.n_feats+128,
+            in_channels=2*model_cfg.encoder_params.n_feats,
             out_channel=model_cfg.encoder_params.n_feats,
             cfm_params=model_cfg.cfm_params,
             decoder_params=model_cfg.decoder_params,
@@ -121,12 +115,8 @@ class MatchaTTS(nn.Module):
         # For RTF computation
         t = dt.datetime.now()
 
-        if self.use_saln:
-            style_mel_mask = self.get_mask_from_lens(style_mel_length)
-            style_vector = self.style_encoder(style_mel, style_mel_mask)
-
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask = self.encoder(x, x_lengths, style_vector)
+        mu_x, logw, x_mask, style_mel_mask = self.encoder(x, x_lengths, style_mel, style_mel_length)
         if self.aligner == "alf":
             duration = nn.functional.softplus(logw).squeeze(1)
             mu_y, y_lens, dur_pred = regulate_len(duration, mu_x.transpose(1, 2), pace=1.0, mel_max_len=None)
@@ -152,7 +142,7 @@ class MatchaTTS(nn.Module):
             encoder_outputs = mu_y[:, :, :y_max_length]
 
         # Generate sample tracing the probability flow
-        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, style_vector)
+        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, style_mel)
         decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         t = (dt.datetime.now() - t).total_seconds()
@@ -190,13 +180,11 @@ class MatchaTTS(nn.Module):
         """
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        if self.use_saln:
-            style_mel_mask = self.get_mask_from_lens(style_mel_lengths)
-            style_vector = self.style_encoder(style_mel, style_mel_mask)
-        mu_x, logw, x_mask = self.encoder(x, x_lengths, style_vector)
+        mu_x, logw, x_mask, style_mel_mask = self.encoder(x, x_lengths, style_mel, style_mel_lengths)
         y_max_length = y.shape[-1]
 
         y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
+        style_mel_mask = (~style_mel_mask).float().unsqueeze(1)
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
 
         return_dict = {}
@@ -238,7 +226,9 @@ class MatchaTTS(nn.Module):
         else:
             raise ValueError(f"Unknown aligner: {self.aligner}")
         # Compute loss of the decoder
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, style_vector=style_vector, cond=cond)
+        # y = torch.cat((style_mel, y), dim=-1)
+        # y_mask = torch.cat((style_mel_mask, y_mask), dim=-1)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, style_mel=style_mel, style_mel_mask=style_mel_mask, cond=cond)
         return_dict["diff_loss"] = diff_loss
         return_dict["loss"] = sum([v for k, v in return_dict.items() if "loss" in k])
         return return_dict

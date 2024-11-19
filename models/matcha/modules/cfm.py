@@ -65,23 +65,32 @@ class BASECFM(torch.nn.Module, ABC):
             cond: Not used but kept for future purposes
         """
         t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
+        sb, sd, st = style.shape
 
         # I am storing this because I can later plot it by putting a debugger here and saving it to a file
         # Or in future might add like a return_all_steps flag
         sol = []
-
+        mask = torch.cat((torch.ones_like(style)[:, :1], mask), dim=-1)
         for step in range(1, len(t_span)):
-            dphi_dt = self.estimator(x, mask, mu, t, style, cond)
+            if step == 1:
+                x = torch.cat((style, x), dim=-1)
+                mu = torch.cat((torch.zeros_like(style), mu), dim=-1)
+            else:
+                x[..., :st] = style
+                mu[..., :st] = torch.zeros_like(style)
+                
+            dphi_dt = self.estimator(x, mask, mu, t, cond)
 
             x = x + dt * dphi_dt
             t = t + dt
             sol.append(x)
             if step < len(t_span) - 1:
                 dt = t_span[step + 1] - t
+        out = sol[-1]
+        out = out[..., st:]
+        return out
 
-        return sol[-1]
-
-    def compute_loss(self, x1, mask, mu, style_vector=None, cond=None):
+    def compute_loss(self, x1, mask, mu, style_mel=None, style_mel_mask=None, cond=None):
         """Computes diffusion loss
 
         Args:
@@ -99,7 +108,7 @@ class BASECFM(torch.nn.Module, ABC):
             y: conditional flow
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-        b, _, t = mu.shape
+        b, _, mu_t = mu.shape
 
         # random timestep
         t = torch.rand([b, 1, 1], device=mu.device, dtype=mu.dtype)
@@ -108,10 +117,15 @@ class BASECFM(torch.nn.Module, ABC):
 
         y = (1 - (1 - self.sigma_min) * t) * z + t * x1
         u = x1 - (1 - self.sigma_min) * z
-        
-        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), style_vector), u, reduction="sum") / (
-            torch.sum(mask) * u.shape[1]
-        )
+
+        y = torch.cat((style_mel, y), dim=-1)
+        mu = torch.cat((torch.zeros_like(style_mel), mu), dim=-1)
+        y_mask = torch.cat((style_mel_mask, mask), dim=-1)
+        u_hat = self.estimator(y, y_mask, mu, t.squeeze())
+        u_hat = u_hat[..., -mu_t:]
+        loss = F.mse_loss(u_hat, u, reduction="none") * mask
+        loss = loss.mean((1, 2)) * mu_t / mask.sum((1, 2))
+        loss = loss.mean()
         return loss, y
 
 
