@@ -28,13 +28,38 @@ class CFMParams:
 
 @dataclass
 class DecoderParams:
-    channels: tuple[int] = (256, 256)
+    name: str = "dit"
+
+    def __post_init__(self):
+        match self.name:
+            case "unet":
+                self.params = UNetParams()
+            case "dit":
+                self.params = DiTParams()
+            case _:
+                raise NameError(f"Unknown decoder: {self.name}")
+
+@dataclass
+class UNetParams:
+    channels: tuple[int] = (512, 512)
     dropout: float = 0.05
-    attention_head_dim: int = 64
+    attention_head_dim: int = 128
     n_blocks: int = 1
     num_mid_blocks: int = 2
     num_heads: int = 2
     act_fn: str = "snakebeta"
+
+    def _dict(self):
+        return asdict(self)
+
+@dataclass
+class DiTParams:
+    dim: int = 512
+    depth: int = 6
+    heads: int = 8
+    ff_mult: int = 2
+    mel_dim: int = 80
+    long_skip_connection: bool = False
 
     def _dict(self):
         return asdict(self)
@@ -56,3 +81,11 @@ class ModelConfig:
     aligner: str = "alf"
     opt: str = "Adam"
     opt_args: frozendict = frozendict(lr=1e-4, betas=(0.9, 0.99))
+
+    @classmethod
+    def DiTModelConfig(cls):
+        return cls(decoder_params = DiTParams())
+    
+    @classmethod
+    def UNetModelConfig(cls):
+        return cls(decoder_params = UNetParams())

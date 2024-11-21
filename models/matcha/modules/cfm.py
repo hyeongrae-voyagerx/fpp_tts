@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from .decoder import Decoder
+from .dit import DiT
 
 
 class BASECFM(torch.nn.Module, ABC):
@@ -79,7 +80,7 @@ class BASECFM(torch.nn.Module, ABC):
                 x[..., :st] = style
                 mu[..., :st] = torch.zeros_like(style)
                 
-            dphi_dt = self.estimator(x, mask, mu, t, cond)
+            dphi_dt = self.estimator(x, mask, mu, t)
 
             x = x + dt * dphi_dt
             t = t + dt
@@ -140,4 +141,7 @@ class CFM(BASECFM):
 
         in_channels = in_channels
         # Just change the architecture of the estimator here
-        self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params._dict())
+        if decoder_params.name == "unet":
+            self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params.params._dict())
+        elif decoder_params.name == "dit":
+            self.estimator = DiT(**decoder_params.params._dict())

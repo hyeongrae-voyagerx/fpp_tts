@@ -27,21 +27,8 @@ class MatchaTTS(nn.Module):
     def __init__(
         self,
         model_cfg
-        # n_vocab,
-        # spk_emb_dim,
-        # n_feats,
-        # encoder,
-        # decoder,
-        # cfm,
-        # data_statistics,
-        # out_size,
-        # optimizer=None,
-        # scheduler=None,
-        # prior_loss=True,
-        # use_precomputed_durations=False,
     ):
         super().__init__()
-        # self.save_hyperparameters(logger=False)
 
         self.n_vocab = model_cfg.n_vocab
         self.n_feats = model_cfg.encoder_params.n_feats

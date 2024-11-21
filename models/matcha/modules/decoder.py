@@ -208,9 +208,9 @@ class Decoder(nn.Module):
         num_mid_blocks=2,
         num_heads=4,
         act_fn="snake",
-        down_block_type="transformer",
-        mid_block_type="transformer",
-        up_block_type="transformer",
+        down_block_type="conformer",
+        mid_block_type="conformer",
+        up_block_type="conformer",
     ):
         super().__init__()
         channels = tuple(channels)
@@ -321,7 +321,7 @@ class Decoder(nn.Module):
                 dim=dim,
                 dim_head=attention_head_dim,
                 heads=num_heads,
-                ff_mult=1,
+                ff_mult=2,
                 conv_expansion_factor=2,
                 ff_dropout=dropout,
                 attn_dropout=dropout,

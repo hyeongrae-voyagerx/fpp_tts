@@ -25,6 +25,8 @@ class Inferencer:
 
     def load(self, fp, voc):
         fp_state_dict = torch.load(fp, weights_only=False)
+        if "model" in fp_state_dict:
+            fp_state_dict["state_dict"] = fp_state_dict.pop("model")
         self.fp.load_state_dict(fp_state_dict["state_dict"], strict=True)
 
         voc_state_dict = torch.load(voc, weights_only=False)
