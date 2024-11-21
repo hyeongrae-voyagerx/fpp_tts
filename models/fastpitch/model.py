@@ -51,11 +51,11 @@ from ..modules.style_encoder import MelStyleEncoder
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def regulate_len(
-    durations, enc_out, pace: float = 1.0, mel_max_len: Optional[int] = None
+    durations, enc_out, mel_max_len: Optional[int] = None
 ):
     """If target=None, then predicted durations are applied"""
     dtype = enc_out.dtype
-    reps = durations.float() / pace
+    reps = durations.float()
     reps = (reps + 0.5).long()
     dec_lens = reps.sum(dim=1)
 
@@ -545,6 +545,7 @@ class FastPitch(nn.Module):
         enc_style_vector=None,
         min_pause=torch.tensor(0.4),
         improve=False,
+        fit_duration_time=None,
         return_vars = ("mel_out", "dec_lens", "pitch_pred")
     ):
         if isinstance(inputs, list):
@@ -594,7 +595,8 @@ class FastPitch(nn.Module):
                     spk_emb = self.speaker_emb(speaker).unsqueeze(1)
                     spk_emb.mul_(self.speaker_emb_weight)
                 enc_out, enc_mask = self.encoder(inputs, conditioning=spk_emb)
-
+            piui = torch.tensor(700)
+            self.onnx_split(enc_out, piui)
             # Predict durations
             log_dur_pred = self.duration_predictor(enc_out, enc_mask).squeeze(-1)
             dur_pred = torch.clamp(torch.exp(log_dur_pred) - 1, 3, max_duration)
@@ -641,9 +643,11 @@ class FastPitch(nn.Module):
                 enc_out = enc_out + energy_emb
             else:
                 energy_pred = None
-
+            dur_pred = self.apply_pace(dur_pred, pace)
+            if fit_duration_time is not None:
+                self.fit_duration_by_time(fit_duration_time, dur_pred, inputs)
             len_regulated, dec_lens, dur_pred = regulate_len(
-                dur_pred if dur_tgt is None else dur_tgt, enc_out, pace, mel_max_len=None
+                dur_pred if dur_tgt is None else dur_tgt, enc_out, mel_max_len=None
             )
 
             if subset == "encoder":
@@ -803,6 +807,30 @@ class FastPitch(nn.Module):
             for p in self.encoder.parameters(): p.requires_grad=True
             for p in self.decoder.parameters(): p.requires_grad=True
             for p in self.proj.parameters(): p.requires_grad=True
+
+
+    def apply_pace(self, duration, pace: float = 1.0):
+        return duration / pace
+        
+    def fit_duration_by_time(self, time: int|float, duration:torch.Tensor, text:torch.Tensor):
+        num_frames = int(time * self.seconds_to_mel)
+        round_tensor = lambda t: (t+0.5).long()
+        for i in range(len(duration)):
+            while round_tensor(duration[i]).sum() > num_frames:
+                space_indices_to_decrease = torch.where(text[i].eq(9) & duration[i].greater_equal(5.5))[0]
+                if space_indices_to_decrease.numel() > 0:
+                    max_idx = space_indices_to_decrease[torch.argmax(duration[i][space_indices_to_decrease])]
+                    duration[i, max_idx] -= 1
+                else:
+                    break
+            
+            while round_tensor(duration[i]).sum() > num_frames:
+                space_indices_to_decrease = torch.where(text[i].ne(9) & duration[i].greater_equal(5.5))[0]
+                if space_indices_to_decrease.numel() > 0:
+                    max_idx = space_indices_to_decrease[torch.argmax(duration[i][space_indices_to_decrease])]
+                    duration[i, max_idx] -= 1
+                else:
+                    break
 
 
     def configure_optimizers(self):
