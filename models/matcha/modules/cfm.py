@@ -1,4 +1,5 @@
 from abc import ABC
+from random import random
 
 import torch
 import torch.nn.functional as F
@@ -14,6 +15,7 @@ class BASECFM(torch.nn.Module, ABC):
         cfm_params,
         use_saln=True,
         spk_emb_dim=128,
+        cfg_rate=0.0,
     ):
         super().__init__()
         self.n_feats = n_feats
@@ -26,9 +28,10 @@ class BASECFM(torch.nn.Module, ABC):
             self.sigma_min = 1e-4
 
         self.estimator = None
+        self.cfg_rate = cfg_rate
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, style=None, cond=None):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, style=None, cond=None, timespan="sway", cfg_stregth=2.0):
         """Forward diffusion
 
         Args:
@@ -47,10 +50,15 @@ class BASECFM(torch.nn.Module, ABC):
                 shape: (batch_size, n_feats, mel_timesteps)
         """
         z = torch.randn_like(mu) * temperature
-        t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device)
-        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, style=style, cond=cond)
+        if timespan == "sway":
+            t_span = self.sway_timespan(0, 1, n_timesteps + 1, device=mu.device)
+        elif timespan == "linear":
+            t_span = self.linear_timespan(0, 1, n_timesteps + 1, device=mu.device)
+        else:
+            raise TypeError(f"Unknown timespan: {timespan}")
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, style=style, cond=cond, cfg_strength=cfg_stregth)
 
-    def solve_euler(self, x, t_span, mu, mask, style, cond):
+    def solve_euler(self, x, t_span, mu, mask, style, cond, cfg_strength=0.0, return_full=True):
         """
         Fixed euler solver for ODEs.
         Args:
@@ -79,8 +87,14 @@ class BASECFM(torch.nn.Module, ABC):
             else:
                 x[..., :st] = style
                 mu[..., :st] = torch.zeros_like(style)
-                
+
             dphi_dt = self.estimator(x, mask, mu, t)
+            
+            if cfg_strength > 0.05:
+                x_null = x.clone()
+                x_null[..., :st] = 0
+                dphi_dt_uncond = self.estimator(x_null, mask, mu, t)
+                dphi_dt = dphi_dt + (dphi_dt - dphi_dt_uncond) * cfg_strength
 
             x = x + dt * dphi_dt
             t = t + dt
@@ -88,7 +102,8 @@ class BASECFM(torch.nn.Module, ABC):
             if step < len(t_span) - 1:
                 dt = t_span[step + 1] - t
         out = sol[-1]
-        out = out[..., st:]
+        if not return_full:
+            out = out[..., st:]
         return out
 
     def compute_loss(self, x1, mask, mu, style_mel=None, style_mel_mask=None, cond=None):
@@ -119,6 +134,8 @@ class BASECFM(torch.nn.Module, ABC):
         y = (1 - (1 - self.sigma_min) * t) * z + t * x1
         u = x1 - (1 - self.sigma_min) * z
 
+        if self.cfg_rate != 0.0 and random() < self.cfg_rate:
+            style_mel = torch.zeros_like(style_mel)
         y = torch.cat((style_mel, y), dim=-1)
         mu = torch.cat((torch.zeros_like(style_mel), mu), dim=-1)
         y_mask = torch.cat((style_mel_mask, mask), dim=-1)
@@ -129,14 +146,25 @@ class BASECFM(torch.nn.Module, ABC):
         loss = loss.mean()
         return loss, y
 
+    @staticmethod
+    def linear_timespan(t_start, t_end, num_timestep, device):
+        return torch.linspace(t_start, t_end, num_timestep, device=device)
+
+    @staticmethod
+    def sway_timespan(t_start, t_end, num_timestep, device, sway_coef=-1.):
+        t = torch.linspace(t_start, t_end, num_timestep, device=device)
+        t = t + sway_coef * (torch.cos(torch.pi / 2 * t) - 1 + t)
+        return t
+
 
 class CFM(BASECFM):
-    def __init__(self, in_channels, out_channel, cfm_params, decoder_params, use_saln=True, spk_emb_dim=128):
+    def __init__(self, in_channels, out_channel, cfm_params, decoder_params, use_saln=True, spk_emb_dim=128, cfg_rate=0.3):
         super().__init__(
             n_feats=in_channels,
             cfm_params=cfm_params,
             use_saln=use_saln,
             spk_emb_dim=spk_emb_dim,
+            cfg_rate=cfg_rate
         )
 
         in_channels = in_channels

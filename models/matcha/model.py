@@ -58,6 +58,7 @@ class MatchaTTS(nn.Module):
             decoder_params=model_cfg.decoder_params,
             use_saln=model_cfg.use_saln,
             spk_emb_dim=128,
+            cfg_rate=model_cfg.cfg_rate
         )
         
         self.update_data_statistics(model_cfg.data_statistics)
@@ -130,7 +131,7 @@ class MatchaTTS(nn.Module):
 
         # Generate sample tracing the probability flow
         decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, style_mel)
-        decoder_outputs = decoder_outputs[:, :, :y_max_length]
+        # decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         t = (dt.datetime.now() - t).total_seconds()
         rtf = t * 22050 / (decoder_outputs.shape[-1] * 256)
@@ -243,12 +244,12 @@ class MatchaTTS(nn.Module):
 
         return return_dict
 
-    def predict_step(self, inputs, return_vars=("mel_out")):
+    def predict_step(self, inputs, return_vars=("mel_out", )):
         x, style_mel = inputs
         x_length = torch.tensor(x.shape[-1:], dtype=torch.long, device=x.device)
         style_len = torch.tensor(style_mel.shape[-1:], dtype=torch.long, device=x.device)
         
-        synthesis_result = self.synthesise(x, x_length, n_timesteps=20, style_mel=style_mel, style_mel_length=style_len)
+        synthesis_result = self.synthesise(x, x_length, n_timesteps=32, style_mel=style_mel, style_mel_length=style_len)
         enc_out, dec_out = synthesis_result["encoder_outputs"], synthesis_result["decoder_outputs"]
         attn = synthesis_result["attn"]
         mel_out, mel_len = synthesis_result["mel"], synthesis_result["mel_lengths"]

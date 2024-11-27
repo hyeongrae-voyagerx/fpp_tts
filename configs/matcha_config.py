@@ -72,6 +72,7 @@ class ModelConfig:
     
     n_vocab: int = 200
     use_saln: bool = True
+    cfg_rate: float = 0.3
     use_prior_loss: bool = True
     encoder_params: EncoderParams = field(default_factory=EncoderParams)
     dur_pred_params: DurPredParams = field(default_factory=DurPredParams)
