@@ -151,17 +151,43 @@ class DataConfig:
             name="korean_va",
             train_kwargs = {
                 "dataset_kwargs": {
-                    "data_dir": "/data/tts/korean_va/train/"
+                    "data_dir": "/data/tts/korean_va/sequential/train/"
                 },
                 "dataloader_kwargs": {
-                    "batch_size": 32,
+                    "batch_size": 108,
                     "num_workers": 32,
                     "drop_last": True,
                 }
             },
             valid_kwargs = {
                 "dataset_kwargs": {
-                    "data_dir": "/data/tts/korean_va/val/"
+                    "data_dir": "/data/tts/korean_va/sequential/val/"
+                },
+                "dataloader_kwargs": {
+                    "batch_size": 32,
+                    "num_workers": 16,
+                    "drop_last": True,
+                }
+            }
+        )
+
+    @classmethod
+    def fmreplacer_base(cls):
+        return cls(
+            name="korean_va",
+            train_kwargs = {
+                "dataset_kwargs": {
+                    "data_dir": "/data/tts/korean_va/sequential/train/"
+                },
+                "dataloader_kwargs": {
+                    "batch_size": 108,
+                    "num_workers": 32,
+                    "drop_last": True,
+                }
+            },
+            valid_kwargs = {
+                "dataset_kwargs": {
+                    "data_dir": "/data/tts/korean_va/sequential/val/"
                 },
                 "dataloader_kwargs": {
                     "batch_size": 32,

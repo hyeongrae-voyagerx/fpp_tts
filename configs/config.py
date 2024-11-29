@@ -81,3 +81,11 @@ class Config:
             trainer_config=TrainerConfig.matcha_base(),
             data_config=DataConfig.matcha_base()
         )
+    
+    @classmethod
+    def fmreplacer_base(cls):
+        return cls(
+            model_name="fmreplacer",
+            trainer_config=TrainerConfig.fmreplacer_base(),
+            data_config=DataConfig.fmreplacer_base()
+        )

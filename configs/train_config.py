@@ -51,5 +51,12 @@ class TrainerConfig:
     def matcha_base(cls):
         return cls(
             use_ema=False,
+            num_train_step = 2_000_000,
+        )
+    
+    @classmethod
+    def fmreplacer_base(cls):
+        return cls(
+            use_ema=False,
             num_train_step = 1_000_000,
         )
