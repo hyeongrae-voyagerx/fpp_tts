@@ -4,6 +4,7 @@ from .nvBigVGAN import BigVGAN
 from .fpcfm import FPCFM
 from .fpbigvgan import FPBigVGAN
 from .matcha import MatchaTTS
+from .fmreplacer import FMReplacer
 
 from utils.neptune import load_weight
 import torch
@@ -14,7 +15,8 @@ _model_dict = {
     "bigvgan": BigVGAN,
     "fpcfm": FPCFM,
     "fpbigvgan": FPBigVGAN,
-    "matcha": MatchaTTS
+    "matcha": MatchaTTS,
+    "fmreplacer": FMReplacer
 }
 
 def get_model(model_config):

@@ -106,7 +106,7 @@ class BASECFM(torch.nn.Module, ABC):
             out = out[..., st:]
         return out
 
-    def compute_loss(self, x1, mask, mu, style_mel=None, style_mel_mask=None, cond=None):
+    def compute_loss(self, x1, mask, mu, start_idx, end_idx, cond=None):
         """Computes diffusion loss
 
         Args:
@@ -135,16 +135,26 @@ class BASECFM(torch.nn.Module, ABC):
         u = x1 - (1 - self.sigma_min) * z
 
         if self.cfg_rate != 0.0 and random() < self.cfg_rate:
-            style_mel = torch.zeros_like(style_mel)
-        y = torch.cat((style_mel, y), dim=-1)
-        mu = torch.cat((torch.zeros_like(style_mel), mu), dim=-1)
-        y_mask = torch.cat((style_mel_mask, mask), dim=-1)
-        u_hat = self.estimator(y, y_mask, mu, t.squeeze())
-        u_hat = u_hat[..., -mu_t:]
-        loss = F.mse_loss(u_hat, u, reduction="none") * mask
-        loss = loss.mean((1, 2)) * mu_t / mask.sum((1, 2))
+            mu = torch.zeros_like(mu)
+        range_mask = self.mask_by_range(mask, start_idx, end_idx)
+        y_mask = mask * range_mask
+        
+        y = torch.where(range_mask, y, x1)
+        u_hat = self.estimator(y, mask, mu, t.squeeze())
+        loss = F.mse_loss(u_hat, u, reduction="none") * y_mask
+        loss = loss.mean((1, 2)) * mu_t / y_mask.sum((1, 2))
         loss = loss.mean()
         return loss, y
+
+    @staticmethod
+    def mask_by_range(mask, start_idx, end_idx):
+        max_len = mask.shape[-1]
+        masks = []
+        for s, e in zip(start_idx, end_idx):
+            arange = torch.arange(max_len, device=mask.device)
+            masks.append(arange.ge(s) & arange.lt(e))
+        masks = torch.stack(masks)
+        return masks.unsqueeze(1)
 
     @staticmethod
     def linear_timespan(t_start, t_end, num_timestep, device):

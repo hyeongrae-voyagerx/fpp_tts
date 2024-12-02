@@ -20,9 +20,7 @@ from .utils.model import (
 )
 from .modules.alf import AlignmentLearningFramework
 
-
-
-class MatchaTTS(nn.Module):
+class FMReplacer(nn.Module):
     def __init__(
         self,
         model_cfg
@@ -61,8 +59,7 @@ class MatchaTTS(nn.Module):
         )
         
         self.update_data_statistics(model_cfg.data_statistics)
-
-        
+        self.replace_ratio = model_cfg.replace_ratio
 
     @torch.inference_mode()
     def synthesise(self, x, x_lengths, style_mel, style_mel_length, n_timesteps=20, temperature=1.0, length_scale=1.0):
@@ -144,7 +141,7 @@ class MatchaTTS(nn.Module):
             "rtf": rtf,
         }
 
-    def forward(self, x, x_lengths, y, y_lengths, style_mel, style_mel_lengths, spks=None, out_size=None, cond=None, durations=None):
+    def forward(self, x, x_lengths, y, y_lengths, out_size=None, cond=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotinic Alignment Search (MAS).
@@ -165,11 +162,10 @@ class MatchaTTS(nn.Module):
             spks (torch.Tensor, optional): speaker ids.
                 shape: (batch_size,)
         """
-        if style_mel is None:
-            y, y_lengths, style_mel, style_mel_lengths = self.split_y(y, y_lengths)
-
+        swap_index_start, swap_index_end = self.get_replace_index(y_lengths)
+        breakpoint()
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask, style_mel_mask = self.encoder(x, x_lengths, style_mel, style_mel_lengths)
+        mu_x, logw, x_mask, style_mel_mask = self.encoder(x, x_lengths, y, y_lengths)
         y_max_length = y.shape[-1]
 
         y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
@@ -217,21 +213,19 @@ class MatchaTTS(nn.Module):
         # Compute loss of the decoder
         # y = torch.cat((style_mel, y), dim=-1)
         # y_mask = torch.cat((style_mel_mask, y_mask), dim=-1)
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, style_mel=style_mel, style_mel_mask=style_mel_mask, cond=cond)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, start_idx=swap_index_start, end_idx=swap_index_end, cond=cond)
         return_dict["diff_loss"] = diff_loss
         return_dict["loss"] = sum([v for k, v in return_dict.items() if "loss" in k])
         return return_dict
-    
+
     def training_step(self, batch, idx):
-        x, x_len, y, y_len, style_mel, style_mel_len = self.parse_batch(batch)
+        x, x_len, y, y_len = self.parse_batch(batch)
 
         return_dict = self(
             x=x,
             x_lengths=x_len,
             y=y,
             y_lengths=y_len,
-            style_mel=style_mel,
-            style_mel_lengths=style_mel_len,
         )
 
         return return_dict
@@ -289,9 +283,8 @@ class MatchaTTS(nn.Module):
     def parse_batch(batch):
         x, x_len = batch[0], batch[1]
         y, y_len = batch[2], batch[3]
-        style_mel, style_mel_len = batch[4], batch[5]
 
-        return x, x_len, y, y_len, style_mel, style_mel_len
+        return x, x_len, y, y_len
 
 
 
@@ -315,6 +308,17 @@ class MatchaTTS(nn.Module):
         ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).type_as(lengths)
         mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
         return mask
+    
+    def get_replace_index(self, mel_length):
+        replace_ratio = torch.zeros_like(mel_length).to(torch.float).uniform_(*self.replace_ratio)
+        replace_len = (mel_length * replace_ratio).to(torch.long)
+        max_index = mel_length - replace_len
+        start = (torch.rand_like(replace_ratio) * max_index).to(torch.long)
+        end = start + replace_len
+
+        return start, end
+        
+
     
 def get_return_tuple(locals_, keys):
     if isinstance(keys, str):
